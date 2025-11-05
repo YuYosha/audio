@@ -1,4 +1,3 @@
-// audio.js
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
@@ -32,10 +31,24 @@ const pointLight = new THREE.PointLight(0x66ccff, 1.5, 100);
 pointLight.position.set(0, 15, 10);
 scene.add(pointLight);
 
-// === Shader Skybox ===
+// === Audio setup ===
+const listener = new THREE.AudioListener();
+camera.add(listener);
+const sound = new THREE.Audio(listener);
+const audioLoader = new THREE.AudioLoader();
+
+audioLoader.load("./music/Pokemon.mp3", (buffer) => {
+  sound.setBuffer(buffer);
+  sound.setLoop(true);
+  sound.setVolume(0.8);
+});
+
+const analyser = new THREE.AudioAnalyser(sound, 256);
+
+// === Shader Skybox (stronger beat pulse) ===
 const skyUniforms = {
   uTime: { value: 0 },
-  uAudio: { value: 0 },
+  uAudio: { value: 0.0 },
 };
 
 const skyShader = {
@@ -52,7 +65,6 @@ const skyShader = {
     uniform float uTime;
     uniform float uAudio;
 
-    // hash noise
     float hash(vec3 p) {
       p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
       p *= 17.0;
@@ -63,21 +75,25 @@ const skyShader = {
       vec3 dir = normalize(vWorldPosition);
       float t = uTime * 0.05;
 
-      // subtle dark gradient
-      vec3 baseColor = mix(vec3(0.0, 0.02, 0.04), vec3(0.0, 0.05, 0.08), dir.y * 0.5 + 0.5);
+      // Enhanced visibility for grid
+      float stripes = abs(sin(dir.y * 100.0 + t * 30.0)) * 0.18;
+      float grid = abs(sin(dir.x * 50.0 + t * 40.0) * sin(dir.z * 50.0 - t * 40.0)) * 0.18;
+      float n = hash(dir * 100.0 + t * 10.0) * 0.03;
 
-      // tech lines pattern
-      float grid = abs(sin(dir.x * 60.0 + t * 40.0) * sin(dir.z * 60.0 - t * 30.0)) * 0.07;
-      float stripes = abs(sin(dir.y * 120.0 + t * 60.0)) * 0.03;
+      // Base darker gradient
+      vec3 baseColor = mix(vec3(0.0, 0.02, 0.05), vec3(0.0, 0.05, 0.09), dir.y * 0.5 + 0.5);
 
-      // random flicker
-      float noise = hash(dir * 100.0 + t * 5.0) * 0.05;
+      // Punchier pulse with deeper blue tones
+      float pulse = smoothstep(0.0, 1.0, uAudio) * 0.5;
+      vec3 pulseTint = mix(vec3(0.0, 0.2, 0.5), vec3(0.0, 0.5, 0.9), pulse);
+      baseColor += pulseTint * pulse;
 
-      // audio pulse glow
-      float pulse = 0.2 * pow(uAudio, 0.5);
+      // Beat glow around grid lines
+      float glow = pow(stripes + grid, 2.0) * (0.4 + pulse * 1.6);
+      vec3 color = baseColor + vec3(glow + n) * 1.1;
 
-      vec3 color = baseColor + vec3(grid + stripes + noise + pulse);
-      color = clamp(color, 0.0, 1.0);
+      // Add subtle tone-shift to make pulse visible
+      color = mix(color, color * vec3(0.6, 0.8, 1.5), pulse * 0.6);
 
       gl_FragColor = vec4(color, 1.0);
     }
@@ -94,21 +110,7 @@ const skyMat = new THREE.ShaderMaterial({
 const skyBox = new THREE.Mesh(skyGeo, skyMat);
 scene.add(skyBox);
 
-// === Audio setup ===
-const listener = new THREE.AudioListener();
-camera.add(listener);
-const sound = new THREE.Audio(listener);
-const audioLoader = new THREE.AudioLoader();
-
-audioLoader.load("./music/Pokemon.mp3", (buffer) => {
-  sound.setBuffer(buffer);
-  sound.setLoop(true);
-  sound.setVolume(0.8);
-});
-
-const analyser = new THREE.AudioAnalyser(sound, 256);
-
-// === Outer circle bars (cyan-pink) ===
+// === Outer Rings ===
 const bars = [];
 const outerRadius = 6;
 const outerCount = 256;
@@ -131,7 +133,7 @@ for (let i = 0; i < outerCount; i++) {
   bars.push(bar);
 }
 
-// === Second outer ring (orange) ===
+// === Second Ring (orange) ===
 const bars2 = [];
 const outerRadius2 = outerRadius + 1.2;
 const rotationOffset = Math.PI / outerCount;
@@ -153,7 +155,7 @@ for (let i = 0; i < outerCount; i++) {
   bars2.push(bar);
 }
 
-// === Third outer ring (white, furthest) ===
+// === Third Ring (white) ===
 const bars3 = [];
 const outerRadius3 = outerRadius2 + 1.2;
 const rotationOffset2 = rotationOffset * 1.5;
@@ -175,7 +177,7 @@ for (let i = 0; i < outerCount; i++) {
   bars3.push(bar);
 }
 
-// === Inner circular "buildings" ===
+// === Inner "city" ===
 const innerBuildings = [];
 const radialCount = 128;
 const layers = 14;
@@ -185,7 +187,6 @@ const minRadius = 0.3;
 for (let i = 0; i < radialCount; i++) {
   const angle = (i / radialCount) * Math.PI * 2;
   const dir = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
-
   for (let j = 0; j < layers; j++) {
     const t = j / layers;
     const r = THREE.MathUtils.lerp(minRadius, maxRadius, t);
@@ -251,13 +252,12 @@ function animate() {
   controls.update();
 
   const data = analyser.getFrequencyData();
-
-  // Update skybox uniforms
   const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
+
   skyUniforms.uTime.value = clock.getElapsedTime();
   skyUniforms.uAudio.value = avg;
 
-  // Outer cyan/pink ring
+  // Bars animation
   for (let i = 0; i < bars.length; i++) {
     const freq = data[i % data.length];
     const scale = (freq / 255) * 8 + 0.5;
@@ -266,7 +266,6 @@ function animate() {
     bars[i].material.emissiveIntensity = 0.3 + (freq / 255) * 0.7;
   }
 
-  // Orange ring (offset)
   for (let i = 0; i < bars2.length; i++) {
     const freq = data[(i * 2) % data.length];
     const inverted = 1.0 - freq / 255;
@@ -276,7 +275,6 @@ function animate() {
     bars2[i].material.emissiveIntensity = 0.3 + inverted * 0.7;
   }
 
-  // White ring (smooth and slower)
   for (let i = 0; i < bars3.length; i++) {
     const freq = data[(i * 3) % data.length];
     const smooth = (Math.sin(Date.now() * 0.002 + i * 0.1) + 1) / 2;
@@ -286,7 +284,6 @@ function animate() {
     bars3[i].material.emissiveIntensity = 0.3 + (freq / 255) * 0.5;
   }
 
-  // Inner city
   for (let k = 0; k < innerBuildings.length; k++) {
     const { mesh, t, i } = innerBuildings[k];
     const index = Math.floor((i / radialCount) * data.length);
@@ -298,8 +295,9 @@ function animate() {
     mesh.material.emissiveIntensity = 0.3 + intensity * 0.9;
   }
 
-  outlinePass.edgeStrength = 6 + avg * 3;
-  outlinePass.pulsePeriod = 2 + avg * 2;
+  const avg2 = data.reduce((a, b) => a + b, 0) / data.length;
+  outlinePass.edgeStrength = 6 + (avg2 / 255) * 3;
+  outlinePass.pulsePeriod = 2 + (avg2 / 255) * 2;
 
   composer.render();
 }
