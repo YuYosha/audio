@@ -37,7 +37,7 @@ camera.add(listener);
 const sound = new THREE.Audio(listener);
 const audioLoader = new THREE.AudioLoader();
 
-audioLoader.load("./music/Pokemon.mp3", (buffer) => {
+audioLoader.load("./music/megalo.mp3", (buffer) => {
   sound.setBuffer(buffer);
   sound.setLoop(true);
   sound.setVolume(0.8);
