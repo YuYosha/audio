@@ -1,24 +1,73 @@
 body {
-    margin: 0;
-    overflow: hidden;
-    background-color: black;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-  }
-  
-  #audio {
-    position: absolute;
-    bottom: 20px;
-    width: 300px;
-    z-index: 2;
-  }
-  
-  #container {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-  }
-  
+  margin: 0;
+  overflow: hidden;
+  background-color: black;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+#audio {
+  position: absolute;
+  bottom: 20px;
+  width: 300px;
+  z-index: 2;
+}
+
+#container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* === Matrix Box Overlays (Centered Text) === */
+.matrix-container {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.matrix-container.left { left: 0.5%; }
+.matrix-container.right { right: 0.5%; }
+
+.matrix-box {
+  width: 95%;
+  height: 24%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 255, 100, 0.45);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 12px rgba(0, 255, 100, 0.2);
+  position: relative;
+}
+
+.matrix-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 220%;
+  color: #00ff99;
+  font-family: 'Courier New', monospace;
+  font-size: 0.95rem;
+  line-height: 1.05rem;
+  text-shadow: 0 0 8px #00ff99;
+  white-space: pre;
+  text-align: center; /* centered horizontally */
+  animation: scrollMatrix 14s linear infinite;
+  opacity: 0.9;
+}
+
+@keyframes scrollMatrix {
+  0% { transform: translateY(-50%); }
+  100% { transform: translateY(0%); }
+}
